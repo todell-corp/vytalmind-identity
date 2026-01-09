@@ -1,0 +1,116 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+.metadata
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# Log files
+*.log
+logs/
+*.log.*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Certificates and Keys
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.keystore
+rootCA.pem
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~.nib
+
+# Test coverage
+.coverage
+htmlcov/
+coverage/
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Security scans
+dependency-check-report.html
+owasp-dependency-check-data/
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Temporal
+.temporal/
+
+# Build artifacts
+*.jar
+*.war
+*.ear
+*.class
+
+# Package Files
+*.nar
+
+# Spring Boot
+spring-shell.log
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+# Application specific
+application-local.yml
+application-secret.yml
+
+# Backup files
+*.bak
+*.backup

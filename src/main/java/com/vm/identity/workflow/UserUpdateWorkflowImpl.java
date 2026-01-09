@@ -1,0 +1,140 @@
+package com.vm.identity.workflow;
+
+import com.vm.identity.activity.UserDatabaseActivity;
+import com.vm.identity.activity.UserKeycloakActivity;
+import com.vm.identity.dto.UserUpdateRequest;
+import com.vm.identity.entity.User;
+import com.vm.identity.util.DeepCopyUtil;
+import io.temporal.activity.ActivityOptions;
+import io.temporal.common.RetryOptions;
+import io.temporal.workflow.Saga;
+import io.temporal.workflow.Workflow;
+import org.keycloak.representations.idm.CredentialRepresentation;
+import org.keycloak.representations.idm.UserRepresentation;
+import org.slf4j.Logger;
+
+import java.time.Duration;
+import java.util.Collections;
+import java.util.UUID;
+
+public class UserUpdateWorkflowImpl implements UserUpdateWorkflow {
+
+    private static final Logger log = Workflow.getLogger(UserUpdateWorkflowImpl.class);
+
+    private final ActivityOptions activityOptions = ActivityOptions.newBuilder()
+            .setStartToCloseTimeout(Duration.ofSeconds(30))
+            .setRetryOptions(RetryOptions.newBuilder()
+                    .setMaximumAttempts(3)
+                    .setInitialInterval(Duration.ofSeconds(1))
+                    .setMaximumInterval(Duration.ofSeconds(10))
+                    .setBackoffCoefficient(2.0)
+                    .build())
+            .build();
+
+    private final UserKeycloakActivity keycloakActivity = Workflow.newActivityStub(UserKeycloakActivity.class,
+            activityOptions);
+    private final UserDatabaseActivity databaseActivity = Workflow.newActivityStub(UserDatabaseActivity.class,
+            activityOptions);
+
+    @Override
+    public User updateUser(String userId, UserUpdateRequest request) {
+        log.info("Starting user update workflow for userId: {}", userId);
+
+        Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
+
+        try {
+            UUID userUuid = UUID.fromString(userId);
+
+            // Step 1: Get current user data for rollback
+            log.info("Reading current user data for userId: {}", userId);
+            User currentUser = databaseActivity.getUser(userUuid);
+            String keycloakUserId = currentUser.getIdpId();
+
+            // Step 2: Update user in database if email, firstName, or lastName changed
+            if (request.getEmail() != null || request.getFirstName() != null || request.getLastName() != null) {
+                log.info("Updating user in database for userId: {}", userId);
+
+                // Create a deep copy for rollback
+                User updatedUser = DeepCopyUtil.deepCopy(currentUser, User.class);
+
+                // Apply updates to user
+                if (request.getEmail() != null) {
+                    updatedUser.setEmail(request.getEmail());
+                }
+                if (request.getFirstName() != null) {
+                    updatedUser.setFirstName(request.getFirstName());
+                }
+                if (request.getLastName() != null) {
+                    updatedUser.setLastName(request.getLastName());
+                }
+
+                // Persist the updated user
+                databaseActivity.updateUser(userUuid, updatedUser);
+
+                // Use rollback copy for compensation
+                saga.addCompensation(() -> {
+                    log.warn("Compensating: Rolling back user update for userId: {}", userId);
+                    databaseActivity.updateUser(userUuid, currentUser);
+                });
+            }
+
+            // Step 3: Update Keycloak user if needed
+            if (request.getEmail() != null || request.getFirstName() != null || request.getLastName() != null) {
+                log.info("Updating user in Keycloak for userId: {}", userId);
+
+                // Fetch current Keycloak user
+                UserRepresentation currentKeycloakUser = keycloakActivity.get(keycloakUserId);
+
+                // Create a deep copy for rollback
+                UserRepresentation updatedKeycloakUser = DeepCopyUtil.deepCopy(currentKeycloakUser, UserRepresentation.class);
+
+                // Apply updates to Keycloak user
+                if (request.getEmail() != null) {
+                    updatedKeycloakUser.setEmail(request.getEmail());
+                }
+                if (request.getFirstName() != null) {
+                    updatedKeycloakUser.setFirstName(request.getFirstName());
+                }
+                if (request.getLastName() != null) {
+                    updatedKeycloakUser.setLastName(request.getLastName());
+                }
+
+                // Persist the updated Keycloak user
+                keycloakActivity.update(keycloakUserId, updatedKeycloakUser);
+
+                // Use rollback copy for compensation
+                saga.addCompensation(() -> {
+                    log.warn("Compensating: Rolling back Keycloak user update for userId: {}", userId);
+                    keycloakActivity.update(keycloakUserId, currentKeycloakUser);
+                });
+            }
+
+            // Step 4: Update password in Keycloak if provided
+            if (request.getPassword() != null) {
+                log.info("Updating password in Keycloak for userId: {}", userId);
+                UserRepresentation keycloakUser = new UserRepresentation();
+                CredentialRepresentation credential = new CredentialRepresentation();
+                credential.setType(CredentialRepresentation.PASSWORD);
+                credential.setValue(request.getPassword());
+                credential.setTemporary(false);
+                keycloakUser.setCredentials(Collections.singletonList(credential));
+
+                keycloakActivity.update(keycloakUserId, keycloakUser);
+                // Note: Previous password cannot be restored for security reasons
+            }
+
+            // Fetch and return the updated user
+            User updatedUser = databaseActivity.getUser(userUuid);
+            log.info("User update workflow completed successfully for userId: {}, username: {}", userId, updatedUser.getUsername());
+            log.info("Updated user object: id={}, username={}, email={}, firstName={}, lastName={}, idpId={}",
+                updatedUser.getId(), updatedUser.getUsername(), updatedUser.getEmail(),
+                updatedUser.getFirstName(), updatedUser.getLastName(), updatedUser.getIdpId());
+            return updatedUser;
+
+        } catch (Exception e) {
+            log.error("Error in user update workflow for userId: {}. Executing compensations.", userId, e);
+            saga.compensate();
+            throw e;
+        }
+    }
+}

@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # VytalmindIdentity Application
+  vytalmind-identity-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vytalmind-identity-app
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-docker}
+      - TEMPORAL_SERVICE_ADDRESS=${TEMPORAL_SERVICE_ADDRESS:-temporal:7233}
+      - TEMPORAL_NAMESPACE=${TEMPORAL_NAMESPACE:-default}
+      - TEMPORAL_TASK_QUEUE=${TEMPORAL_TASK_QUEUE:-vytalmind-identity-queue}
+      - TEMPORAL_ENCRYPTION_ENABLED=${TEMPORAL_ENCRYPTION_ENABLED:-false}
+      - TEMPORAL_ENCRYPTION_KEY_PROVIDER=${TEMPORAL_ENCRYPTION_KEY_PROVIDER:-environment}
+      - TEMPORAL_ENCRYPTION_KEY_ID=${TEMPORAL_ENCRYPTION_KEY_ID:-key-2025-12}
+      - TEMPORAL_ENCRYPTION_KEY_2025_12=${TEMPORAL_ENCRYPTION_KEY_2025_12:-}
+      - VAULT_URI=${VAULT_URI:-http://vault:8200}
+      - VAULT_TOKEN=${VAULT_TOKEN:-}
+      - VAULT_SECRET_PATH=${VAULT_SECRET_PATH:-secret/data/temporal/encryption}
+      - DATABASE_URL=${DATABASE_URL:-jdbc:postgresql://localhost:5432/vytalmind-identity}
+      - DATABASE_USERNAME=${DATABASE_USERNAME:-postgres}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-postgres}
+      - DATABASE_CREDENTIAL_PROVIDER=environment
+      - KEYCLOAK_SERVER_URL=${KEYCLOAK_SERVER_URL:-https://keycloak.odell.com}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-vytalmind}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-vytalmind-identity-service}
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
+      - KEYCLOAK_CREDENTIAL_PROVIDER=environment
+    ports:
+      - "8080:8080"
+    networks:
+      - temporal-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# Docker network for all Temporal-related services
+networks:
+  temporal-network:
+    driver: bridge
+

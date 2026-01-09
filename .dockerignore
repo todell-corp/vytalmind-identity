@@ -1,0 +1,100 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+docs/
+*.md
+
+# IDE files
+.idea/
+.vscode/
+.project
+.classpath
+.settings/
+*.iml
+*.iws
+*.ipr
+
+# OS files
+.DS_Store
+Thumbs.db
+*~
+
+# Maven build artifacts (we build inside Docker)
+target/
+*.jar
+*.war
+*.ear
+
+# Test files (not needed in production image)
+src/test/
+**/test/
+**/*Test.java
+**/*Tests.java
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Docker files (don't copy into image)
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+
+# Scripts (unless needed in container)
+run.sh
+scripts/
+
+# Security
+rootCA.pem
+*.key
+*.crt
+*.pem
+*.p12
+*.jks
+
+# Coverage and test reports
+coverage/
+htmlcov/
+.coverage
+*.cover
+surefire-reports/
+dependency-check-report.html
+
+# Build tools cache
+.mvn/
+mvnw
+mvnw.cmd
+
+# Temporal
+.temporal/
+
+# GitHub Actions artifacts
+.github/
+
+# Backup files
+*.bak
+*.backup

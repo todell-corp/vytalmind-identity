@@ -1,0 +1,214 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build test image
+        run: |
+          docker build --target builder -t vytalmind-identity-builder:test .
+
+      - name: Run tests in container
+        run: |
+          docker run --name vytalmind-identity-test-${{ github.run_id }} \
+            vytalmind-identity-builder:test \
+            mvn test -B
+        continue-on-error: true
+
+      - name: Copy test results from container
+        if: always()
+        run: |
+          docker cp vytalmind-identity-test-${{ github.run_id }}:/app/target/surefire-reports ./target/surefire-reports || true
+          docker rm vytalmind-identity-test-${{ github.run_id }} || true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: target/surefire-reports/
+          retention-days: 7
+
+  docker-build:
+    name: Build and Push Docker Image
+    runs-on: self-hosted
+    needs: test
+    if: github.event_name != 'pull_request'
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+          build-args: |
+            VERSION=${{ github.sha }}
+
+      - name: Rotate cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: self-hosted
+    needs: test
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && vars.ENABLE_SONAR == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube Scan in container
+        run: |
+          docker run --name vytalmind-identity-sonar-${{ github.run_id }} \
+            -v $(pwd):/app \
+            -w /app \
+            vytalmind-identity-builder:test \
+            mvn sonar:sonar \
+              -Dsonar.projectKey=vytalmind-identity \
+              -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+              -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+        continue-on-error: true
+
+      - name: Clean up SonarQube container
+        if: always()
+        run: |
+          docker rm vytalmind-identity-sonar-${{ github.run_id }} || true
+
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: self-hosted
+    needs: [docker-build]
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    environment:
+      name: development
+      url: https://identity.vytalmind.com
+
+    env:
+      # Spring Configuration
+      SPRING_PROFILES_ACTIVE: ${{ secrets.SPRING_PROFILES_ACTIVE || 'docker' }}
+
+      # Temporal Connection Settings
+      TEMPORAL_SERVICE_ADDRESS: ${{ secrets.TEMPORAL_SERVICE_ADDRESS }}
+      TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE || 'default' }}
+      TEMPORAL_TASK_QUEUE: ${{ secrets.TEMPORAL_TASK_QUEUE || 'vytalmind-identity-queue' }}
+
+      # Temporal Encryption Settings
+      TEMPORAL_ENCRYPTION_ENABLED: ${{ secrets.TEMPORAL_ENCRYPTION_ENABLED }}
+      TEMPORAL_ENCRYPTION_KEY_PROVIDER: ${{ secrets.TEMPORAL_ENCRYPTION_KEY_PROVIDER }}
+      TEMPORAL_ENCRYPTION_KEY_ID: ${{ secrets.TEMPORAL_ENCRYPTION_KEY_ID }}
+      TEMPORAL_ENCRYPTION_KEY_2025_12: ${{ secrets.TEMPORAL_ENCRYPTION_KEY_2025_12 }}
+
+      # Vault Configuration
+      VAULT_URI: ${{ secrets.VAULT_URI }}
+      VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+      VAULT_SECRET_PATH: ${{ secrets.VAULT_SECRET_PATH }}
+
+      # Microservice URLs
+      INGREDIENT_BACKEND_URL: ${{ secrets.INGREDIENT_BACKEND_URL }}
+      INGREDIENT_SEARCH_URL: ${{ secrets.INGREDIENT_SEARCH_URL }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Stop existing containers
+        run: |
+          docker compose down || true
+        continue-on-error: true
+
+      - name: Build Docker image
+        run: |
+          docker compose build --no-cache
+
+      - name: Start services
+        run: |
+          docker compose up -d
+
+      - name: Wait for service to be healthy
+        run: |
+          echo "Waiting for vytalmind-identity-app to be healthy..."
+          timeout 120 bash -c 'until docker inspect --format="{{.State.Health.Status}}" vytalmind-identity-app | grep -q healthy; do sleep 3; done' || {
+            echo "Health check failed, checking container status..."
+            docker compose ps
+            docker compose logs vytalmind-identity-app --tail=50
+            exit 1
+          }
+          echo "✓ Service is healthy!"
+
+      - name: Verify deployment
+        run: |
+          echo "Testing health endpoint..."
+          curl -f http://localhost:8080/actuator/health || exit 1
+          echo "✓ Deployment verified successfully!"
+
+      - name: Show running containers
+        run: |
+          docker compose ps
+
+      - name: Clean up old Docker images
+        run: |
+          docker image prune -f --filter "until=24h"
+        continue-on-error: true
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Development deployment successful"
+            echo "URL: https://identity.vytalmind.com"
+          else
+            echo "❌ Development deployment failed"
+          fi

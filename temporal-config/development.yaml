@@ -1,0 +1,26 @@
+# Temporal Dynamic Configuration for Development
+frontend.enableClientVersionCheck:
+  - value: true
+    constraints: {}
+
+history.defaultActivityRetryPolicy:
+  - value:
+      InitialIntervalInSeconds: 1
+      MaximumIntervalCoefficient: 10.0
+      BackoffCoefficient: 2.0
+      MaximumAttempts: 3
+
+history.defaultWorkflowRetryPolicy:
+  - value:
+      InitialIntervalInSeconds: 1
+      MaximumIntervalCoefficient: 10.0
+      BackoffCoefficient: 2.0
+      MaximumAttempts: 3
+
+limit.maxIDLength:
+  - value: 1000
+    constraints: {}
+
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true
+    constraints: {}

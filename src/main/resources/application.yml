@@ -1,0 +1,137 @@
+spring:
+  application:
+    name: vytalmind-identity-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  mvc:
+    favicon:
+      enabled: true
+
+  # Database Configuration
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://postgres.odell.com:5432/vytalmind-identity}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate # Flyway manages schema
+    show-sql: ${JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+# Temporal Configuration
+temporal:
+  connection:
+    target: ${TEMPORAL_SERVICE_ADDRESS:internal.temporal.odell.com:7233}
+  namespace: ${TEMPORAL_NAMESPACE:default}
+  worker:
+    task-queue: ${TEMPORAL_TASK_QUEUE:vytalmind-identity-queue}
+
+  # Encryption Configuration for Payloads
+  encryption:
+    enabled: ${TEMPORAL_ENCRYPTION_ENABLED:false}
+    key-provider: ${TEMPORAL_ENCRYPTION_KEY_PROVIDER:vault} # Options: environment, vault
+    current-key-id: ${TEMPORAL_ENCRYPTION_KEY_ID:key-2025-12}
+
+    # Environment-based key storage (dev/staging)
+    # Only used when key-provider=environment
+    keys:
+      key-2025-12: ${TEMPORAL_ENCRYPTION_KEY_2025_12:#{null}}
+      # Add additional keys for rotation: key-2024-12, etc.
+
+    # Vault configuration (production)
+    vault:
+      enabled: ${TEMPORAL_VAULT_ENABLED:false}
+      uri: ${VAULT_URI:https://vault.odell.com:8200}
+      token: ${VAULT_TOKEN:}
+      secret-path: ${VAULT_SECRET_PATH:secret/data/temporal/encryption}
+
+# Database Credential Provider
+database:
+  credential-provider: ${DATABASE_CREDENTIAL_PROVIDER:vault}
+  vault:
+    enabled: ${DATABASE_VAULT_ENABLED:false}
+    uri: ${VAULT_URI:https://vault.odell.com:8200}
+    token: ${VAULT_TOKEN:}
+    secret-path: ${DATABASE_VAULT_SECRET_PATH:secret/data/database/vytalmind-identity}
+
+# Keycloak Configuration (Service Account with Client Credentials)
+keycloak:
+  server-url: ${KEYCLOAK_SERVER_URL:https://keycloak.odell.com}
+  realm: ${KEYCLOAK_REALM:vytalmind}
+  client-id: ${KEYCLOAK_CLIENT_ID:vytalmind-identity-service}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET:}
+  credential-provider: ${KEYCLOAK_CREDENTIAL_PROVIDER:vault}
+  vault:
+    enabled: ${KEYCLOAK_VAULT_ENABLED:false}
+    uri: ${VAULT_URI:https://vault.odell.com:8200}
+    token: ${VAULT_TOKEN:}
+    secret-path: ${KEYCLOAK_VAULT_SECRET_PATH:secret/data/keycloak/service-account}
+
+# Actuator & Health Checks
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+
+# Resilience4j Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      keycloakService:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 20s
+        failureRateThreshold: 60
+  retry:
+    instances:
+      keycloakService:
+        maxAttempts: 3
+        waitDuration: 1s
+        exponentialBackoffMultiplier: 2.0
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.vm.identity: DEBUG
+    io.temporal: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# OpenAPI
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
