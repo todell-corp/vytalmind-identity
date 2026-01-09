@@ -26,13 +26,15 @@ public class UserController {
     @PostMapping
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserCreateRequest request) {
         log.info("Received request to create user with username: {}", request.getUsername());
-        try {
-            UserResponse response = userService.createUser(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (Exception e) {
-            log.error("Error creating user with username: {}", request.getUsername(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        UserResponse response = userService.createUser(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/{userId}")
+    public ResponseEntity<UserResponse> getUser(@PathVariable String userId) {
+        log.info("Received request to get user: {}", userId);
+        UserResponse response = userService.getUser(userId);
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{userId}")
@@ -40,24 +42,14 @@ public class UserController {
             @PathVariable String userId,
             @Valid @RequestBody UserUpdateRequest request) {
         log.info("Received request to update user: {}", userId);
-        try {
-            UserResponse response = userService.updateUser(userId, request);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Error updating user: {}", userId, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        UserResponse response = userService.updateUser(userId, request);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{userId}")
-    public ResponseEntity<UserResponse> deleteUser(@PathVariable String userId) {
+    public ResponseEntity<Void> deleteUser(@PathVariable String userId) {
         log.info("Received request to delete user: {}", userId);
-        try {
-            UserResponse response = userService.deleteUser(userId);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Error deleting user: {}", userId, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        userService.deleteUser(userId);
+        return ResponseEntity.noContent().build();
     }
 }

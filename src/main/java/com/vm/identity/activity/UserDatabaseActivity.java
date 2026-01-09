@@ -27,6 +27,9 @@ public interface UserDatabaseActivity {
     @ActivityMethod(name = "GetUserFromDatabase")
     User getUser(UUID userId);
 
+    @ActivityMethod(name = "CheckUsernameExists")
+    boolean checkUsernameExists(String username);
+
     // Profile operations
     @ActivityMethod(name = "CreateUserProfileInDatabase")
     UserProfile createProfile(UserProfile profile);

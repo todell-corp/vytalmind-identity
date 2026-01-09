@@ -153,4 +153,32 @@ public class KeycloakClient {
             throw new ServiceException("Failed to delete user from Keycloak: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * Disable a user in Keycloak by setting enabled=false.
+     *
+     * @param userId the Keycloak user ID
+     */
+    public void disableUser(String userId) {
+        log.info("Disabling user in Keycloak: {}", userId);
+
+        try {
+            UserRepresentation user = keycloak.realm(realm)
+                    .users()
+                    .get(userId)
+                    .toRepresentation();
+
+            user.setEnabled(false);
+
+            keycloak.realm(realm)
+                    .users()
+                    .get(userId)
+                    .update(user);
+
+            log.info("Successfully disabled user in Keycloak: {}", userId);
+        } catch (Exception e) {
+            log.error("Failed to disable user in Keycloak: {}", userId, e);
+            throw new ServiceException("Failed to disable user in Keycloak: " + e.getMessage(), e);
+        }
+    }
 }

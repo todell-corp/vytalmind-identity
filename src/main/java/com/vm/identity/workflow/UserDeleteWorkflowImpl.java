@@ -8,6 +8,7 @@ import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
 import io.temporal.workflow.Saga;
 import io.temporal.workflow.Workflow;
+import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 
 import java.time.Duration;
@@ -39,17 +40,20 @@ public class UserDeleteWorkflowImpl implements UserDeleteWorkflow {
         try {
             UUID userUuid = UUID.fromString(userId);
 
-            // Step 1: Get user data for Keycloak deletion
+            // Step 1: Get user data for Keycloak account disabling
             log.info("Fetching user data for userId: {}", userId);
             User user = databaseActivity.getUser(userUuid);
             String keycloakUserId = user.getIdpId();
 
-            // Step 2: Delete user from Keycloak first
-            log.info("Deleting user from Keycloak for userId: {}", userId);
-            keycloakActivity.delete(keycloakUserId);
+            // Step 2: Disable user in Keycloak first
+            log.info("Disabling user in Keycloak for userId: {}", userId);
+            keycloakActivity.disable(keycloakUserId);
             saga.addCompensation(() -> {
-                log.warn("Compensating: Cannot fully restore Keycloak user for userId: {} (password lost)", userId);
-                // Note: Keycloak user can be partially restored but password cannot be recovered
+                log.warn("Compensating: Re-enabling Keycloak user for userId: {}", userId);
+                // Restore by fetching the user and setting enabled=true
+                UserRepresentation restoredUser = keycloakActivity.get(keycloakUserId);
+                restoredUser.setEnabled(true);
+                keycloakActivity.update(keycloakUserId, restoredUser);
             });
 
             // Step 3: Soft delete user from database

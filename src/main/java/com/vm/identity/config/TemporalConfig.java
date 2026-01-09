@@ -5,8 +5,9 @@ import com.vm.identity.activity.UserKeycloakActivity;
 import com.vm.identity.security.EncryptionPayloadCodec;
 import com.vm.identity.security.KeyProvider;
 import com.vm.identity.workflow.UserCreateWorkflowImpl;
-import com.vm.identity.workflow.UserUpdateWorkflowImpl;
 import com.vm.identity.workflow.UserDeleteWorkflowImpl;
+import com.vm.identity.workflow.UserGetWorkflowImpl;
+import com.vm.identity.workflow.UserUpdateWorkflowImpl;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowClientOptions;
 import io.temporal.common.converter.CodecDataConverter;
@@ -172,6 +173,7 @@ public class TemporalConfig {
         // Register workflow implementations
         worker.registerWorkflowImplementationTypes(
                 UserCreateWorkflowImpl.class,
+                UserGetWorkflowImpl.class,
                 UserUpdateWorkflowImpl.class,
                 UserDeleteWorkflowImpl.class
         );
@@ -185,18 +187,16 @@ public class TemporalConfig {
         return worker;
     }
 
-    @PostConstruct
-    public void startWorkerFactory() {
-        // Worker factory will be started after all beans are created
-    }
-
     @Bean
     public WorkerFactoryStarter workerFactoryStarter(WorkerFactory workerFactory, Worker worker) {
+        log.info("Starting Temporal worker factory...");
+        workerFactory.start();
+        log.info("Temporal worker factory started successfully");
         return new WorkerFactoryStarter(workerFactory);
     }
 
     /**
-     * Helper class to start the worker factory after Spring context is fully initialized
+     * Helper class to manage worker factory lifecycle
      */
     public static class WorkerFactoryStarter {
         private static final Logger log = LoggerFactory.getLogger(WorkerFactoryStarter.class);
@@ -204,11 +204,9 @@ public class TemporalConfig {
 
         public WorkerFactoryStarter(WorkerFactory workerFactory) {
             this.workerFactory = workerFactory;
-            log.info("Starting Temporal worker factory...");
-            workerFactory.start();
-            log.info("Temporal worker factory started successfully");
         }
 
+        @PreDestroy
         public void shutdown() {
             log.info("Shutting down Temporal worker factory...");
             workerFactory.shutdown();

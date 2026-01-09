@@ -116,6 +116,22 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean checkUsernameExists(String username) {
+        log.info("Activity: Checking if username exists in database: {}", username);
+        try {
+            return userRepository.existsByUsername(username);
+        } catch (Exception e) {
+            log.error("Activity failed: check username exists in database: {}", username, e);
+            throw ApplicationFailure.newFailure(
+                    "Failed to check username existence in database",
+                    "DatabaseCheckFailed",
+                    Map.of("username", username, "error", e.getMessage())
+            );
+        }
+    }
+
+    @Override
     @Transactional
     public UserProfile createProfile(UserProfile profile) {
         log.info("Activity: Creating user profile in database for user: {}", profile.getUserId());

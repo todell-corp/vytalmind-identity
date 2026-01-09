@@ -5,6 +5,7 @@ import com.vm.identity.activity.UserKeycloakActivity;
 import com.vm.identity.entity.User;
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
+import io.temporal.failure.ApplicationFailure;
 import io.temporal.workflow.Saga;
 import io.temporal.workflow.Workflow;
 import org.keycloak.representations.idm.CredentialRepresentation;
@@ -13,6 +14,7 @@ import org.slf4j.Logger;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Map;
 import java.util.UUID;
 
 public class UserCreateWorkflowImpl implements UserCreateWorkflow {
@@ -39,11 +41,24 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
             String lastName) {
         log.info("Starting user creation workflow for userId: {}, username: {}", userId, username);
 
+        // Step 0: Validate inputs before creating saga (validation errors don't need
+        // compensation)
+        UUID userUuid = UUID.fromString(userId);
+
+        log.info("Checking if username already exists: {}", username);
+        boolean usernameExists = databaseActivity.checkUsernameExists(username);
+        if (usernameExists) {
+            log.error("Username already exists: {}", username);
+            throw ApplicationFailure.newNonRetryableFailure(
+                    "Username already exists: " + username,
+                    "UsernameAlreadyExists",
+                    Map.of("username", username));
+        }
+
+        // Create saga after validation passes
         Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
 
         try {
-            UUID userUuid = UUID.fromString(userId);
-
             // Step 1: Create user in Keycloak
             log.info("Creating user in Keycloak for username: {}", username);
             UserRepresentation keycloakUser = new UserRepresentation();

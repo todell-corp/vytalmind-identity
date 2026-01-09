@@ -20,6 +20,9 @@ public interface UserKeycloakActivity {
     @ActivityMethod(name = "DeleteUserFromKeycloak")
     void delete(String keycloakUserId);
 
+    @ActivityMethod(name = "DisableUserInKeycloak")
+    void disable(String keycloakUserId);
+
     @ActivityMethod(name = "GetUserFromKeycloak")
     UserRepresentation get(String keycloakUserId);
 }

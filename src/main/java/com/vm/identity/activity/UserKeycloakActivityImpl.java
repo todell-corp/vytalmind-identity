@@ -69,6 +69,21 @@ public class UserKeycloakActivityImpl implements UserKeycloakActivity {
     }
 
     @Override
+    public void disable(String keycloakUserId) {
+        log.info("Activity: Disabling user in Keycloak: {}", keycloakUserId);
+        try {
+            keycloakClient.disableUser(keycloakUserId);
+        } catch (Exception e) {
+            log.error("Activity failed: disable user in Keycloak: {}", keycloakUserId, e);
+            throw ApplicationFailure.newFailure(
+                    "Failed to disable user in Keycloak",
+                    "KeycloakDisableFailed",
+                    Map.of("keycloakUserId", keycloakUserId, "error", e.getMessage())
+            );
+        }
+    }
+
+    @Override
     public UserRepresentation get(String keycloakUserId) {
         log.info("Activity: Fetching user from Keycloak: {}", keycloakUserId);
         try {

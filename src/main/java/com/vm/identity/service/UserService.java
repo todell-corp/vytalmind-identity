@@ -6,6 +6,7 @@ import com.vm.identity.dto.UserUpdateRequest;
 import com.vm.identity.entity.User;
 import com.vm.identity.workflow.UserCreateWorkflow;
 import com.vm.identity.workflow.UserDeleteWorkflow;
+import com.vm.identity.workflow.UserGetWorkflow;
 import com.vm.identity.workflow.UserUpdateWorkflow;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowOptions;
@@ -40,37 +41,31 @@ public class UserService {
         WorkflowOptions options = WorkflowOptions.newBuilder()
                 .setWorkflowId(workflowId)
                 .setTaskQueue(taskQueue)
-                .setWorkflowExecutionTimeout(Duration.ofMinutes(5))
+                .setWorkflowExecutionTimeout(Duration.ofSeconds(5))
                 .build();
 
         UserCreateWorkflow workflow = workflowClient.newWorkflowStub(UserCreateWorkflow.class, options);
 
-        try {
-            String createdUserId = workflow.createUser(
-                    userId.toString(),
-                    request.getUsername(),
-                    request.getEmail(),
-                    request.getPassword(),
-                    request.getFirstName(),
-                    request.getLastName()
-            );
+        String createdUserId = workflow.createUser(
+                userId.toString(),
+                request.getUsername(),
+                request.getEmail(),
+                request.getPassword(),
+                request.getFirstName(),
+                request.getLastName()
+        );
 
-            UserResponse response = new UserResponse();
-            response.setUserId(createdUserId);
-            response.setUsername(request.getUsername());
-            response.setEmail(request.getEmail());
-            response.setFirstName(request.getFirstName());
-            response.setLastName(request.getLastName());
-            response.setStatus("User created successfully");
-            response.setWorkflowId(workflowId);
+        UserResponse response = new UserResponse();
+        response.setUserId(createdUserId);
+        response.setUsername(request.getUsername());
+        response.setEmail(request.getEmail());
+        response.setFirstName(request.getFirstName());
+        response.setLastName(request.getLastName());
+        response.setStatus("User created successfully");
+        response.setWorkflowId(workflowId);
 
-            log.info("User created successfully with userId: {}, username: {}", createdUserId, request.getUsername());
-            return response;
-
-        } catch (Exception e) {
-            log.error("Failed to create user with username: {}", request.getUsername(), e);
-            throw new RuntimeException("Failed to create user: " + e.getMessage(), e);
-        }
+        log.info("User created successfully with userId: {}, username: {}", createdUserId, request.getUsername());
+        return response;
     }
 
     public UserResponse updateUser(String userId, UserUpdateRequest request) {
@@ -81,7 +76,7 @@ public class UserService {
         WorkflowOptions options = WorkflowOptions.newBuilder()
                 .setWorkflowId(workflowId)
                 .setTaskQueue(taskQueue)
-                .setWorkflowExecutionTimeout(Duration.ofMinutes(5))
+                .setWorkflowExecutionTimeout(Duration.ofSeconds(5))
                 .build();
 
         UserUpdateWorkflow workflow = workflowClient.newWorkflowStub(UserUpdateWorkflow.class, options);
@@ -111,7 +106,41 @@ public class UserService {
         }
     }
 
-    public UserResponse deleteUser(String userId) {
+    public UserResponse getUser(String userId) {
+        log.info("Getting user: {}", userId);
+
+        String workflowId = "user-get-" + userId + "-" + UUID.randomUUID();
+
+        WorkflowOptions options = WorkflowOptions.newBuilder()
+                .setWorkflowId(workflowId)
+                .setTaskQueue(taskQueue)
+                .setWorkflowExecutionTimeout(Duration.ofSeconds(5))
+                .build();
+
+        UserGetWorkflow workflow = workflowClient.newWorkflowStub(UserGetWorkflow.class, options);
+
+        try {
+            User user = workflow.getUser(userId);
+
+            UserResponse response = new UserResponse();
+            response.setUserId(user.getId().toString());
+            response.setUsername(user.getUsername());
+            response.setEmail(user.getEmail());
+            response.setFirstName(user.getFirstName());
+            response.setLastName(user.getLastName());
+            response.setStatus("User retrieved successfully");
+            response.setWorkflowId(workflowId);
+
+            log.info("User retrieved successfully: {} (username: {})", userId, user.getUsername());
+            return response;
+
+        } catch (Exception e) {
+            log.error("Failed to get user: {}", userId, e);
+            throw new RuntimeException("Failed to get user: " + e.getMessage(), e);
+        }
+    }
+
+    public void deleteUser(String userId) {
         log.info("Deleting user: {}", userId);
 
         String workflowId = "user-delete-" + userId + "-" + UUID.randomUUID();
@@ -119,21 +148,14 @@ public class UserService {
         WorkflowOptions options = WorkflowOptions.newBuilder()
                 .setWorkflowId(workflowId)
                 .setTaskQueue(taskQueue)
-                .setWorkflowExecutionTimeout(Duration.ofMinutes(5))
+                .setWorkflowExecutionTimeout(Duration.ofSeconds(5))
                 .build();
 
         UserDeleteWorkflow workflow = workflowClient.newWorkflowStub(UserDeleteWorkflow.class, options);
 
         try {
-            String result = workflow.deleteUser(userId);
-
-            UserResponse response = new UserResponse();
-            response.setUserId(userId);
-            response.setStatus(result);
-            response.setWorkflowId(workflowId);
-
+            workflow.deleteUser(userId);
             log.info("User deleted successfully: {}", userId);
-            return response;
 
         } catch (Exception e) {
             log.error("Failed to delete user: {}", userId, e);
