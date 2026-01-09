@@ -40,14 +40,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorResponse);
     }
 
-    @ExceptionHandler(UsernameAlreadyExistsException.class)
-    public ResponseEntity<ErrorResponse> handleUsernameAlreadyExists(UsernameAlreadyExistsException ex) {
-        log.warn("Username already exists: {}", ex.getUsername());
+    @ExceptionHandler(UserAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleUserAlreadyExists(UserAlreadyExistsException ex) {
+        log.warn("User already exists - username: {}, email: {}", ex.getUsername(), ex.getEmail());
+
+        Map<String, String> details = new HashMap<>();
+        if (ex.getUsername() != null) {
+            details.put("username", ex.getUsername());
+        }
+        if (ex.getEmail() != null) {
+            details.put("email", ex.getEmail());
+        }
 
         ErrorResponse errorResponse = new ErrorResponse(
-                "USERNAME_ALREADY_EXISTS",
+                "USER_ALREADY_EXISTS",
                 ex.getMessage(),
-                ex.getUsername() != null ? Map.of("username", ex.getUsername()) : null,
+                details.isEmpty() ? null : details,
                 Instant.now()
         );
 

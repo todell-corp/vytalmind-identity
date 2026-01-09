@@ -118,6 +118,36 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean checkEmailExists(String email) {
+        log.info("Activity: Checking if email exists in database: email={}", email);
+        try {
+            return userRepository.existsByEmailExcludingDeleted(email);
+        } catch (Exception e) {
+            log.error("Activity failed: check email exists in database", e);
+            throw ApplicationFailure.newFailure(
+                    "Failed to check email existence in database",
+                    "DatabaseCheckFailed",
+                    Map.of("email", email, "error", e.getMessage()));
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean checkEmailOrUsernameExists(String email, String username) {
+        log.info("Activity: Checking if email or username exists in database: email={}, username={}", email, username);
+        try {
+            return userRepository.existsByEmailOrUsernameExcludingDeleted(email, username);
+        } catch (Exception e) {
+            log.error("Activity failed: check email or username exists in database", e);
+            throw ApplicationFailure.newFailure(
+                    "Failed to check email or username existence in database",
+                    "DatabaseCheckFailed",
+                    Map.of("email", email, "username", username, "error", e.getMessage()));
+        }
+    }
+
+    @Override
     @Transactional
     public UserProfile createProfile(UserProfile profile) {
         log.info("Activity: Creating user profile in database for user: {}", profile.getUserId());

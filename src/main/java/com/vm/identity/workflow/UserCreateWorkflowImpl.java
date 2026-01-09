@@ -47,11 +47,12 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
         // compensation)
         UUID userUuid = UUID.fromString(userId);
 
-        log.info("Checking if username already exists: {}", username);
-        boolean usernameExists = databaseActivity.checkUsernameExists(username);
-        if (usernameExists) {
-            log.error("Username already exists: {}", username);
-            return WorkflowResult.error("UsernameAlreadyExists");
+        log.info("Checking if email or username already exists: email={}, username={}", email, username);
+        boolean userExists = databaseActivity.checkEmailOrUsernameExists(email, username);
+        if (userExists) {
+            log.error("Email or username already exists: email={}, username={}", email, username);
+            return WorkflowResult.error("UserAlreadyExists",
+                    Map.of("username", username, "email", email));
         }
 
         // Create saga after validation passes

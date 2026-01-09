@@ -32,11 +32,12 @@ public class ApplicationFailureHandler {
             details = (Map<String, ?>) detailsObj;
         }
 
-        // Handle username already exists from Temporal workflow
-        if ("UsernameAlreadyExists".equals(failureType)) {
-            log.warn("Username already exists: {}", message);
+        // Handle user already exists from Temporal workflow
+        if ("UserAlreadyExists".equals(failureType)) {
+            log.warn("User already exists: {}", message);
             String username = details != null ? (String) details.get("username") : null;
-            return new UsernameAlreadyExistsException(message, username, ex);
+            String email = details != null ? (String) details.get("email") : null;
+            return new UserAlreadyExistsException(message, username, email, ex);
         }
 
         // Handle user not found from Temporal workflow
@@ -59,21 +60,40 @@ public class ApplicationFailureHandler {
      * @return RuntimeException (specific subtype based on error code)
      */
     public static RuntimeException mapErrorCode(String errorCode, String context) {
-        log.info("Mapping error code: {}, context: {}", errorCode, context);
-        // Handle username already exists
-        if ("UsernameAlreadyExists".equals(errorCode)) {
-            log.warn("Username already exists: {}", context);
-            return new UsernameAlreadyExistsException("Username already exists: " + context, context);
+        return mapErrorCode(errorCode, Map.of("context", context));
+    }
+
+    /**
+     * Maps an error code from WorkflowResult to an appropriate custom exception with additional details.
+     *
+     * @param errorCode the error code from the workflow
+     * @param details   map of additional details (e.g., username, email, userId)
+     * @return RuntimeException (specific subtype based on error code)
+     */
+    public static RuntimeException mapErrorCode(String errorCode, Map<String, String> details) {
+        log.info("Mapping error code: {}, details: {}", errorCode, details);
+
+        // Handle user already exists (email or username conflict)
+        if ("UserAlreadyExists".equals(errorCode)) {
+            String username = details.get("username");
+            String email = details.get("email");
+            log.warn("User already exists - username: {}, email: {}", username, email);
+            return new UserAlreadyExistsException(
+                    "User with this email or username already exists",
+                    username,
+                    email
+            );
         }
 
         // Handle user not found
         if ("UserNotFound".equals(errorCode)) {
+            String context = details.get("context");
             log.warn("User not found: {}", context);
             return new UserNotFoundException("User not found: " + context, context);
         }
 
         // Generic error handling
-        log.error("Application failure: errorCode={}, context={}", errorCode, context);
+        log.error("Application failure: errorCode={}, details={}", errorCode, details);
         return new RuntimeException("Application failure: " + errorCode);
     }
 }

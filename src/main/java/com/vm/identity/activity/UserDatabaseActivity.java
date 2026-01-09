@@ -31,6 +31,12 @@ public interface UserDatabaseActivity {
     @ActivityMethod(name = "CheckUsernameExists")
     boolean checkUsernameExists(String username);
 
+    @ActivityMethod(name = "CheckEmailExists")
+    boolean checkEmailExists(String email);
+
+    @ActivityMethod(name = "CheckEmailOrUsernameExists")
+    boolean checkEmailOrUsernameExists(String email, String username);
+
     // Profile operations
     @ActivityMethod(name = "CreateUserProfileInDatabase")
     UserProfile createProfile(UserProfile profile);

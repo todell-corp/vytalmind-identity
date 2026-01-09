@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -58,7 +59,20 @@ public class UserUpdateWorkflowImpl implements UserUpdateWorkflow {
             User currentUser = currentUserOpt.get();
             String keycloakUserId = currentUser.getIdpId();
 
-            // Step 2: Update user in database if email, firstName, or lastName changed
+            // Step 2: Check if email already exists when email is actually changing
+            if (request.getEmail() != null && !request.getEmail().equals(currentUser.getEmail())) {
+                String emailToCheck = request.getEmail();
+
+                boolean emailExists = databaseActivity.checkEmailExists(emailToCheck);
+                if (emailExists) {
+                    log.error("Email already exists: email={}, current email: {}", emailToCheck,
+                            currentUser.getEmail());
+                    return WorkflowResult.error("UserAlreadyExists",
+                            Map.of("email", emailToCheck));
+                }
+            }
+
+            // Step 3: Update user in database if email, firstName, or lastName changed
             if (request.getEmail() != null || request.getFirstName() != null || request.getLastName() != null) {
                 log.info("Updating user in database for userId: {}", userId);
 
@@ -86,7 +100,7 @@ public class UserUpdateWorkflowImpl implements UserUpdateWorkflow {
                 });
             }
 
-            // Step 3: Update Keycloak user if needed
+            // Step 4: Update Keycloak user if needed
             if (request.getEmail() != null || request.getFirstName() != null || request.getLastName() != null) {
                 log.info("Updating user in Keycloak for userId: {}", userId);
 
@@ -94,7 +108,8 @@ public class UserUpdateWorkflowImpl implements UserUpdateWorkflow {
                 UserRepresentation currentKeycloakUser = keycloakActivity.get(keycloakUserId);
 
                 // Create a deep copy for rollback
-                UserRepresentation updatedKeycloakUser = DeepCopyUtil.deepCopy(currentKeycloakUser, UserRepresentation.class);
+                UserRepresentation updatedKeycloakUser = DeepCopyUtil.deepCopy(currentKeycloakUser,
+                        UserRepresentation.class);
 
                 // Apply updates to Keycloak user
                 if (request.getEmail() != null) {
@@ -117,7 +132,7 @@ public class UserUpdateWorkflowImpl implements UserUpdateWorkflow {
                 });
             }
 
-            // Step 4: Update password in Keycloak if provided
+            // Step 5: Update password in Keycloak if provided
             if (request.getPassword() != null) {
                 log.info("Updating password in Keycloak for userId: {}", userId);
                 UserRepresentation keycloakUser = new UserRepresentation();
@@ -138,14 +153,16 @@ public class UserUpdateWorkflowImpl implements UserUpdateWorkflow {
                 return WorkflowResult.error("UserNotFound");
             }
             User updatedUser = updatedUserOpt.get();
-            log.info("User update workflow completed successfully for userId: {}, username: {}", userId, updatedUser.getUsername());
+            log.info("User update workflow completed successfully for userId: {}, username: {}", userId,
+                    updatedUser.getUsername());
             log.info("Updated user object: id={}, username={}, email={}, firstName={}, lastName={}, idpId={}",
-                updatedUser.getId(), updatedUser.getUsername(), updatedUser.getEmail(),
-                updatedUser.getFirstName(), updatedUser.getLastName(), updatedUser.getIdpId());
+                    updatedUser.getId(), updatedUser.getUsername(), updatedUser.getEmail(),
+                    updatedUser.getFirstName(), updatedUser.getLastName(), updatedUser.getIdpId());
             return WorkflowResult.ok(updatedUser);
 
         } catch (ApplicationFailure e) {
-            log.error("Application failure in user update workflow for userId: {}. Executing compensations.", userId, e);
+            log.error("Application failure in user update workflow for userId: {}. Executing compensations.", userId,
+                    e);
             saga.compensate();
             return WorkflowResult.error(e.getType());
         } catch (Exception e) {

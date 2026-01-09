@@ -18,6 +18,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -57,7 +59,10 @@ public class UserService {
                 request.getLastName());
 
         if (!result.isSuccess()) {
-            throw ApplicationFailureHandler.mapErrorCode(result.errorCode(), request.getUsername());
+            Map<String, String> errorDetails = new HashMap<>();
+            errorDetails.put("username", request.getUsername());
+            errorDetails.put("email", request.getEmail());
+            throw ApplicationFailureHandler.mapErrorCode(result.errorCode(), errorDetails);
         }
 
         UserResponse response = new UserResponse();
@@ -89,7 +94,11 @@ public class UserService {
         WorkflowResult<User> result = workflow.updateUser(userId, request);
 
         if (!result.isSuccess()) {
-            throw ApplicationFailureHandler.mapErrorCode(result.errorCode(), userId);
+            Map<String, String> errorDetails = result.errorDetails() != null
+                    ? new HashMap<>(result.errorDetails())
+                    : new HashMap<>();
+            errorDetails.putIfAbsent("userId", userId);
+            throw ApplicationFailureHandler.mapErrorCode(result.errorCode(), errorDetails);
         }
 
         User updatedUser = result.value();
