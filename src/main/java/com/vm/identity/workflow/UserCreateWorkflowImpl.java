@@ -3,6 +3,7 @@ package com.vm.identity.workflow;
 import com.vm.identity.activity.UserDatabaseActivity;
 import com.vm.identity.activity.UserKeycloakActivity;
 import com.vm.identity.entity.User;
+import com.vm.identity.exception.ApplicationFailureHandler;
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
 import io.temporal.failure.ApplicationFailure;
@@ -37,7 +38,8 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
             activityOptions);
 
     @Override
-    public String createUser(String userId, String username, String email, String password, String firstName,
+    public WorkflowResult<String> createUser(String userId, String username, String email, String password,
+            String firstName,
             String lastName) {
         log.info("Starting user creation workflow for userId: {}, username: {}", userId, username);
 
@@ -49,10 +51,7 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
         boolean usernameExists = databaseActivity.checkUsernameExists(username);
         if (usernameExists) {
             log.error("Username already exists: {}", username);
-            throw ApplicationFailure.newNonRetryableFailure(
-                    "Username already exists: " + username,
-                    "UsernameAlreadyExists",
-                    Map.of("username", username));
+            return WorkflowResult.error("UsernameAlreadyExists");
         }
 
         // Create saga after validation passes
@@ -97,8 +96,15 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
             });
 
             log.info("User creation workflow completed successfully for userId: {}, username: {}", userId, username);
-            return createdUser.getId().toString();
+            return WorkflowResult.ok(createdUser.getId().toString());
 
+        } catch (ApplicationFailure e) {
+            log.error(
+                    "Application failure in user creation workflow for userId: {}, username: {}. Executing compensations.",
+                    userId,
+                    username, e);
+            saga.compensate();
+            return WorkflowResult.error(e.getType());
         } catch (Exception e) {
             log.error("Error in user creation workflow for userId: {}, username: {}. Executing compensations.", userId,
                     username, e);

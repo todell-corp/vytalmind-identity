@@ -4,9 +4,11 @@ import com.vm.identity.activity.UserDatabaseActivity;
 import com.vm.identity.activity.UserKeycloakActivity;
 import com.vm.identity.dto.UserUpdateRequest;
 import com.vm.identity.entity.User;
+import com.vm.identity.exception.ApplicationFailureHandler;
 import com.vm.identity.util.DeepCopyUtil;
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
+import io.temporal.failure.ApplicationFailure;
 import io.temporal.workflow.Saga;
 import io.temporal.workflow.Workflow;
 import org.keycloak.representations.idm.CredentialRepresentation;
@@ -15,6 +17,7 @@ import org.slf4j.Logger;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.UUID;
 
 public class UserUpdateWorkflowImpl implements UserUpdateWorkflow {
@@ -37,7 +40,7 @@ public class UserUpdateWorkflowImpl implements UserUpdateWorkflow {
             activityOptions);
 
     @Override
-    public User updateUser(String userId, UserUpdateRequest request) {
+    public WorkflowResult<User> updateUser(String userId, UserUpdateRequest request) {
         log.info("Starting user update workflow for userId: {}", userId);
 
         Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
@@ -47,7 +50,12 @@ public class UserUpdateWorkflowImpl implements UserUpdateWorkflow {
 
             // Step 1: Get current user data for rollback
             log.info("Reading current user data for userId: {}", userId);
-            User currentUser = databaseActivity.getUser(userUuid);
+            Optional<User> currentUserOpt = databaseActivity.getUser(userUuid);
+            if (currentUserOpt.isEmpty()) {
+                log.error("User not found: {}", userId);
+                return WorkflowResult.error("UserNotFound");
+            }
+            User currentUser = currentUserOpt.get();
             String keycloakUserId = currentUser.getIdpId();
 
             // Step 2: Update user in database if email, firstName, or lastName changed
@@ -124,13 +132,22 @@ public class UserUpdateWorkflowImpl implements UserUpdateWorkflow {
             }
 
             // Fetch and return the updated user
-            User updatedUser = databaseActivity.getUser(userUuid);
+            Optional<User> updatedUserOpt = databaseActivity.getUser(userUuid);
+            if (updatedUserOpt.isEmpty()) {
+                log.error("User not found after update: {}", userId);
+                return WorkflowResult.error("UserNotFound");
+            }
+            User updatedUser = updatedUserOpt.get();
             log.info("User update workflow completed successfully for userId: {}, username: {}", userId, updatedUser.getUsername());
             log.info("Updated user object: id={}, username={}, email={}, firstName={}, lastName={}, idpId={}",
                 updatedUser.getId(), updatedUser.getUsername(), updatedUser.getEmail(),
                 updatedUser.getFirstName(), updatedUser.getLastName(), updatedUser.getIdpId());
-            return updatedUser;
+            return WorkflowResult.ok(updatedUser);
 
+        } catch (ApplicationFailure e) {
+            log.error("Application failure in user update workflow for userId: {}. Executing compensations.", userId, e);
+            saga.compensate();
+            return WorkflowResult.error(e.getType());
         } catch (Exception e) {
             log.error("Error in user update workflow for userId: {}. Executing compensations.", userId, e);
             saga.compensate();

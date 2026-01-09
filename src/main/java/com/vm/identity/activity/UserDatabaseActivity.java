@@ -1,5 +1,6 @@
 package com.vm.identity.activity;
 
+import java.util.Optional;
 import com.vm.identity.entity.User;
 import com.vm.identity.entity.UserProfile;
 import io.temporal.activity.ActivityInterface;
@@ -25,7 +26,7 @@ public interface UserDatabaseActivity {
     void deleteUser(UUID userId);
 
     @ActivityMethod(name = "GetUserFromDatabase")
-    User getUser(UUID userId);
+    Optional<User> getUser(UUID userId);
 
     @ActivityMethod(name = "CheckUsernameExists")
     boolean checkUsernameExists(String username);

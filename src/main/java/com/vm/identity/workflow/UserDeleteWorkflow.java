@@ -7,5 +7,5 @@ import io.temporal.workflow.WorkflowMethod;
 public interface UserDeleteWorkflow {
 
     @WorkflowMethod
-    String deleteUser(String userId);
+    WorkflowResult<String> deleteUser(String userId);
 }

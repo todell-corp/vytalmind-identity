@@ -4,14 +4,18 @@ import com.vm.identity.activity.UserDatabaseActivity;
 import com.vm.identity.activity.UserKeycloakActivity;
 import com.vm.identity.entity.User;
 import com.vm.identity.entity.UserProfile;
+import com.vm.identity.exception.ApplicationFailureHandler;
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
+import io.temporal.failure.ApplicationFailure;
 import io.temporal.workflow.Saga;
 import io.temporal.workflow.Workflow;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 
 import java.time.Duration;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 public class UserDeleteWorkflowImpl implements UserDeleteWorkflow {
@@ -32,20 +36,34 @@ public class UserDeleteWorkflowImpl implements UserDeleteWorkflow {
     private final UserDatabaseActivity databaseActivity = Workflow.newActivityStub(UserDatabaseActivity.class, activityOptions);
 
     @Override
-    public String deleteUser(String userId) {
+    public WorkflowResult<String> deleteUser(String userId) {
         log.info("Starting user deletion workflow for userId: {}", userId);
 
+        // Step 0: Validate user exists before creating saga (validation errors don't need compensation)
+        UUID userUuid = UUID.fromString(userId);
+
+        log.info("Checking if user exists: {}", userId);
+        Optional<User> userOpt;
+        try {
+            userOpt = databaseActivity.getUser(userUuid);
+        } catch (Exception e) {
+            log.error("Error fetching user: {}", userId, e);
+            return WorkflowResult.error("UserNotFound");
+        }
+
+        if (userOpt.isEmpty()) {
+            log.error("User not found: {}", userId);
+            return WorkflowResult.error("UserNotFound");
+        }
+
+        User user = userOpt.get();
+        String keycloakUserId = user.getIdpId();
+
+        // Create saga after validation passes
         Saga saga = new Saga(new Saga.Options.Builder().setParallelCompensation(false).build());
 
         try {
-            UUID userUuid = UUID.fromString(userId);
-
-            // Step 1: Get user data for Keycloak account disabling
-            log.info("Fetching user data for userId: {}", userId);
-            User user = databaseActivity.getUser(userUuid);
-            String keycloakUserId = user.getIdpId();
-
-            // Step 2: Disable user in Keycloak first
+            // Step 1: Disable user in Keycloak first
             log.info("Disabling user in Keycloak for userId: {}", userId);
             keycloakActivity.disable(keycloakUserId);
             saga.addCompensation(() -> {
@@ -56,21 +74,26 @@ public class UserDeleteWorkflowImpl implements UserDeleteWorkflow {
                 keycloakActivity.update(keycloakUserId, restoredUser);
             });
 
-            // Step 3: Soft delete user from database
+            // Step 2: Soft delete user from database
             log.info("Soft deleting user from database for userId: {}", userId);
             databaseActivity.deleteUser(userUuid);
             saga.addCompensation(() -> {
                 log.warn("Compensating: Restoring user in database for userId: {}", userId);
                 // Restore user by unsetting the deleted flag
-                User restoredUser = databaseActivity.getUser(userUuid);
-                restoredUser.setDeleted(false);
-                restoredUser.setDeletedAt(null);
-                databaseActivity.updateUser(userUuid, restoredUser);
+                databaseActivity.getUser(userUuid).ifPresent(restoredUser -> {
+                    restoredUser.setDeleted(false);
+                    restoredUser.setDeletedAt(null);
+                    databaseActivity.updateUser(userUuid, restoredUser);
+                });
             });
 
             log.info("User deletion workflow completed successfully for userId: {}", userId);
-            return "User deleted successfully";
+            return WorkflowResult.ok("User deleted successfully");
 
+        } catch (ApplicationFailure e) {
+            log.error("Application failure in user deletion workflow for userId: {}. Executing compensations.", userId, e);
+            saga.compensate();
+            return WorkflowResult.error(e.getType());
         } catch (Exception e) {
             log.error("Error in user deletion workflow for userId: {}. Executing compensations.", userId, e);
             saga.compensate();

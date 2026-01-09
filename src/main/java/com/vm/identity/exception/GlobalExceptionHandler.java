@@ -40,6 +40,34 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorResponse);
     }
 
+    @ExceptionHandler(UsernameAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleUsernameAlreadyExists(UsernameAlreadyExistsException ex) {
+        log.warn("Username already exists: {}", ex.getUsername());
+
+        ErrorResponse errorResponse = new ErrorResponse(
+                "USERNAME_ALREADY_EXISTS",
+                ex.getMessage(),
+                ex.getUsername() != null ? Map.of("username", ex.getUsername()) : null,
+                Instant.now()
+        );
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex) {
+        log.warn("User not found: {}", ex.getUserId());
+
+        ErrorResponse errorResponse = new ErrorResponse(
+                "USER_NOT_FOUND",
+                ex.getMessage(),
+                ex.getUserId() != null ? Map.of("userId", ex.getUserId()) : null,
+                Instant.now()
+        );
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
     @ExceptionHandler(WorkflowNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleWorkflowNotFound(WorkflowNotFoundException ex) {
         log.warn("Workflow not found: {}", ex.getWorkflowId());

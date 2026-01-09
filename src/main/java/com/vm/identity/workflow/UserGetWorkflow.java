@@ -8,5 +8,5 @@ import io.temporal.workflow.WorkflowMethod;
 public interface UserGetWorkflow {
 
     @WorkflowMethod
-    User getUser(String userId);
+    WorkflowResult<User> getUser(String userId);
 }

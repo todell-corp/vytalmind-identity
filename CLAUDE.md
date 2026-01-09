@@ -196,6 +196,10 @@ openssl rand -base64 32
 
 ## Important Development Notes
 
+### Code Quality Standards
+
+- **Never add dead code**: Do not add unreachable code, placeholder exceptions, or comments like "Never reached, satisfies compiler". Write clean code where all paths are meaningful and necessary.
+
 ### Workflow Development
 
 - Workflows must be deterministic (no random numbers, system time, or I/O)

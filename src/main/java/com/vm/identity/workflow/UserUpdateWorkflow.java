@@ -9,5 +9,5 @@ import io.temporal.workflow.WorkflowMethod;
 public interface UserUpdateWorkflow {
 
     @WorkflowMethod
-    User updateUser(String userId, UserUpdateRequest request);
+    WorkflowResult<User> updateUser(String userId, UserUpdateRequest request);
 }

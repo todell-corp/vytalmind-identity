@@ -1,5 +1,6 @@
 package com.vm.identity.activity;
 
+import java.util.Optional;
 import com.vm.identity.entity.User;
 import com.vm.identity.entity.UserProfile;
 import com.vm.identity.repository.UserProfileRepository;
@@ -26,8 +27,7 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
 
     public UserDatabaseActivityImpl(
             UserRepository userRepository,
-            UserProfileRepository profileRepository
-    ) {
+            UserProfileRepository profileRepository) {
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
     }
@@ -43,8 +43,7 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
             throw ApplicationFailure.newFailure(
                     "Failed to create user in database",
                     "DatabaseCreateFailed",
-                    Map.of("username", user.getUsername(), "error", e.getMessage())
-            );
+                    Map.of("username", user.getUsername(), "error", e.getMessage()));
         }
     }
 
@@ -73,8 +72,7 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
             throw ApplicationFailure.newFailure(
                     "Failed to update user in database",
                     "DatabaseUpdateFailed",
-                    Map.of("userId", userId.toString(), "error", e.getMessage())
-            );
+                    Map.of("userId", userId.toString(), "error", e.getMessage()));
         }
     }
 
@@ -93,27 +91,16 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
             throw ApplicationFailure.newFailure(
                     "Failed to soft delete user from database",
                     "DatabaseDeleteFailed",
-                    Map.of("userId", userId.toString(), "error", e.getMessage())
-            );
+                    Map.of("userId", userId.toString(), "error", e.getMessage()));
         }
     }
 
     @Override
     @Transactional(readOnly = true)
-    public User getUser(UUID userId) {
+    public Optional<User> getUser(UUID userId) {
         log.info("Activity: Fetching user from database: {}", userId);
-        try {
-            return userRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
-        } catch (Exception e) {
-            log.error("Activity failed: get user from database: {}", userId, e);
-            throw ApplicationFailure.newFailure(
-                    "Failed to get user from database",
-                    "DatabaseGetFailed",
-                    Map.of("userId", userId.toString(), "error", e.getMessage())
-            );
-        }
-    }
+        return userRepository.findById(userId);
+    };
 
     @Override
     @Transactional(readOnly = true)
@@ -126,8 +113,7 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
             throw ApplicationFailure.newFailure(
                     "Failed to check username existence in database",
                     "DatabaseCheckFailed",
-                    Map.of("username", username, "error", e.getMessage())
-            );
+                    Map.of("username", username, "error", e.getMessage()));
         }
     }
 
@@ -142,8 +128,7 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
             throw ApplicationFailure.newFailure(
                     "Failed to create user profile",
                     "ProfileCreateFailed",
-                    Map.of("userId", profile.getUserId().toString(), "error", e.getMessage())
-            );
+                    Map.of("userId", profile.getUserId().toString(), "error", e.getMessage()));
         }
     }
 
@@ -190,8 +175,7 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
             throw ApplicationFailure.newFailure(
                     "Failed to update user profile",
                     "ProfileUpdateFailed",
-                    Map.of("userId", userId.toString(), "error", e.getMessage())
-            );
+                    Map.of("userId", userId.toString(), "error", e.getMessage()));
         }
     }
 
@@ -201,14 +185,13 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
         log.info("Activity: Fetching user profile from database for user: {}", userId);
         try {
             return profileRepository.findByUserId(userId)
-                    .orElse(null);  // Profile is optional
+                    .orElse(null); // Profile is optional
         } catch (Exception e) {
             log.error("Activity failed: get user profile from database: {}", userId, e);
             throw ApplicationFailure.newFailure(
                     "Failed to get user profile from database",
                     "ProfileGetFailed",
-                    Map.of("userId", userId.toString(), "error", e.getMessage())
-            );
+                    Map.of("userId", userId.toString(), "error", e.getMessage()));
         }
     }
 }
