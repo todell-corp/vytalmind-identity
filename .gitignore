@@ -59,6 +59,7 @@ logs/
 # Certificates and Keys
 *.pem
 !rootCA.pem
+!mkcert-root-ca.pem
 *.key
 *.crt
 *.p12

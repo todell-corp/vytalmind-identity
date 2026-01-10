@@ -3,13 +3,20 @@ FROM maven:3.9-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
-# Copy and install the root CA certificate into Java truststore
+# Copy and install the root CA certificates into Java truststore
 COPY rootCA.pem /tmp/rootCA.pem
+COPY mkcert-root-ca.pem /tmp/mkcert-root-ca.pem
 RUN keytool -import -trustcacerts -noprompt \
     -alias odell-root-ca \
     -file /tmp/rootCA.pem \
     -keystore $JAVA_HOME/lib/security/cacerts \
-    -storepass changeit
+    -storepass changeit && \
+    keytool -import -trustcacerts -noprompt \
+    -alias mkcert-root-ca \
+    -file /tmp/mkcert-root-ca.pem \
+    -keystore $JAVA_HOME/lib/security/cacerts \
+    -storepass changeit && \
+    rm /tmp/rootCA.pem /tmp/mkcert-root-ca.pem
 
 # Copy pom.xml first for better layer caching
 COPY pom.xml .
@@ -26,14 +33,20 @@ FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
-# Copy and install the root CA certificate into Java truststore (runtime stage)
+# Copy and install the root CA certificates into Java truststore (runtime stage)
 COPY rootCA.pem /tmp/rootCA.pem
+COPY mkcert-root-ca.pem /tmp/mkcert-root-ca.pem
 RUN keytool -import -trustcacerts -noprompt \
     -alias odell-root-ca \
     -file /tmp/rootCA.pem \
     -keystore $JAVA_HOME/lib/security/cacerts \
     -storepass changeit && \
-    rm /tmp/rootCA.pem
+    keytool -import -trustcacerts -noprompt \
+    -alias mkcert-root-ca \
+    -file /tmp/mkcert-root-ca.pem \
+    -keystore $JAVA_HOME/lib/security/cacerts \
+    -storepass changeit && \
+    rm /tmp/rootCA.pem /tmp/mkcert-root-ca.pem
 
 # Create non-root user
 RUN groupadd -r vmidentity && useradd -r -g vmidentity vmidentity

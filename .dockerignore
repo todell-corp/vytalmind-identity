@@ -73,6 +73,7 @@ scripts/
 *.crt
 *.pem
 !rootCA.pem
+!mkcert-root-ca.pem
 *.p12
 *.jks
 
