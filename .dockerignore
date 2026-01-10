@@ -72,6 +72,7 @@ scripts/
 *.key
 *.crt
 *.pem
+!rootCA.pem
 *.p12
 *.jks
 
