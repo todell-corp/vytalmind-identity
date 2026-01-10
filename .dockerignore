@@ -69,7 +69,6 @@ run.sh
 scripts/
 
 # Security
-rootCA.pem
 *.key
 *.crt
 *.pem

@@ -6,7 +6,7 @@ WORKDIR /app
 # Copy and install the root CA certificate into Java truststore
 COPY rootCA.pem /tmp/rootCA.pem
 RUN keytool -import -trustcacerts -noprompt \
-    -alias nexus-odell-root-ca \
+    -alias odell-root-ca \
     -file /tmp/rootCA.pem \
     -keystore $JAVA_HOME/lib/security/cacerts \
     -storepass changeit
@@ -29,7 +29,7 @@ WORKDIR /app
 # Copy and install the root CA certificate into Java truststore (runtime stage)
 COPY rootCA.pem /tmp/rootCA.pem
 RUN keytool -import -trustcacerts -noprompt \
-    -alias nexus-odell-root-ca \
+    -alias odell-root-ca \
     -file /tmp/rootCA.pem \
     -keystore $JAVA_HOME/lib/security/cacerts \
     -storepass changeit && \
