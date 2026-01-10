@@ -35,9 +35,8 @@ public class ApplicationFailureHandler {
         // Handle user already exists from Temporal workflow
         if ("UserAlreadyExists".equals(failureType)) {
             log.warn("User already exists: {}", message);
-            String username = details != null ? (String) details.get("username") : null;
             String email = details != null ? (String) details.get("email") : null;
-            return new UserAlreadyExistsException(message, username, email, ex);
+            return new UserAlreadyExistsException(message, email, ex);
         }
 
         // Handle user not found from Temporal workflow
@@ -73,14 +72,12 @@ public class ApplicationFailureHandler {
     public static RuntimeException mapErrorCode(String errorCode, Map<String, String> details) {
         log.info("Mapping error code: {}, details: {}", errorCode, details);
 
-        // Handle user already exists (email or username conflict)
+        // Handle user already exists (email conflict)
         if ("UserAlreadyExists".equals(errorCode)) {
-            String username = details.get("username");
             String email = details.get("email");
-            log.warn("User already exists - username: {}, email: {}", username, email);
+            log.warn("User already exists - email: {}", email);
             return new UserAlreadyExistsException(
-                    "User with this email or username already exists",
-                    username,
+                    "User with this email already exists",
                     email
             );
         }

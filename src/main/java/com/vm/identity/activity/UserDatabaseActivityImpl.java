@@ -35,7 +35,7 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
     @Override
     @Transactional
     public User createUser(User user) {
-        log.info("Activity: Creating user in database: {}", user.getUsername());
+        log.info("Activity: Creating user in database: {}", user.getEmail());
         try {
             return userRepository.save(user);
         } catch (Exception e) {
@@ -43,7 +43,7 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
             throw ApplicationFailure.newFailure(
                     "Failed to create user in database",
                     "DatabaseCreateFailed",
-                    Map.of("username", user.getUsername(), "error", e.getMessage()));
+                    Map.of("email", user.getEmail(), "error", e.getMessage()));
         }
     }
 
@@ -104,21 +104,6 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
 
     @Override
     @Transactional(readOnly = true)
-    public boolean checkUsernameExists(String username) {
-        log.info("Activity: Checking if username exists in database: {}", username);
-        try {
-            return userRepository.existsByUsername(username);
-        } catch (Exception e) {
-            log.error("Activity failed: check username exists in database: {}", username, e);
-            throw ApplicationFailure.newFailure(
-                    "Failed to check username existence in database",
-                    "DatabaseCheckFailed",
-                    Map.of("username", username, "error", e.getMessage()));
-        }
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public boolean checkEmailExists(String email) {
         log.info("Activity: Checking if email exists in database: email={}", email);
         try {
@@ -129,21 +114,6 @@ public class UserDatabaseActivityImpl implements UserDatabaseActivity {
                     "Failed to check email existence in database",
                     "DatabaseCheckFailed",
                     Map.of("email", email, "error", e.getMessage()));
-        }
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public boolean checkEmailOrUsernameExists(String email, String username) {
-        log.info("Activity: Checking if email or username exists in database: email={}, username={}", email, username);
-        try {
-            return userRepository.existsByEmailOrUsernameExcludingDeleted(email, username);
-        } catch (Exception e) {
-            log.error("Activity failed: check email or username exists in database", e);
-            throw ApplicationFailure.newFailure(
-                    "Failed to check email or username existence in database",
-                    "DatabaseCheckFailed",
-                    Map.of("email", email, "username", username, "error", e.getMessage()));
         }
     }
 

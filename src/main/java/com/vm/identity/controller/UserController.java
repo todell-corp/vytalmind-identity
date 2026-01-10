@@ -25,7 +25,7 @@ public class UserController {
 
     @PostMapping
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserCreateRequest request) {
-        log.info("Received request to create user with username: {}", request.getUsername());
+        log.info("Received request to create user with email: {}", request.getEmail());
         UserResponse response = userService.createUser(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

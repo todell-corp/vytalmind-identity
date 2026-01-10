@@ -38,21 +38,21 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
             activityOptions);
 
     @Override
-    public WorkflowResult<String> createUser(String userId, String username, String email, String password,
+    public WorkflowResult<String> createUser(String userId, String email, String password,
             String firstName,
             String lastName) {
-        log.info("Starting user creation workflow for userId: {}, username: {}", userId, username);
+        log.info("Starting user creation workflow for userId: {}, email: {}", userId, email);
 
         // Step 0: Validate inputs before creating saga (validation errors don't need
         // compensation)
         UUID userUuid = UUID.fromString(userId);
 
-        log.info("Checking if email or username already exists: email={}, username={}", email, username);
-        boolean userExists = databaseActivity.checkEmailOrUsernameExists(email, username);
+        log.info("Checking if email already exists: email={}", email);
+        boolean userExists = databaseActivity.checkEmailExists(email);
         if (userExists) {
-            log.error("Email or username already exists: email={}, username={}", email, username);
+            log.error("Email already exists: email={}", email);
             return WorkflowResult.error("UserAlreadyExists",
-                    Map.of("username", username, "email", email));
+                    Map.of("email", email));
         }
 
         // Create saga after validation passes
@@ -60,9 +60,9 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
 
         try {
             // Step 1: Create user in Keycloak
-            log.info("Creating user in Keycloak for username: {}", username);
+            log.info("Creating user in Keycloak for email: {}", email);
             UserRepresentation keycloakUser = new UserRepresentation();
-            keycloakUser.setUsername(username);
+            keycloakUser.setUsername(email);
             keycloakUser.setEmail(email);
             keycloakUser.setFirstName(firstName);
             keycloakUser.setLastName(lastName);
@@ -81,10 +81,9 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
             });
 
             // Step 2: Create user in database
-            log.info("Creating user in database for userId: {}, username: {}", userId, username);
+            log.info("Creating user in database for userId: {}, email: {}", userId, email);
             User user = new User();
             user.setId(userUuid);
-            user.setUsername(username);
             user.setEmail(email);
             user.setFirstName(firstName);
             user.setLastName(lastName);
@@ -96,19 +95,19 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
                 databaseActivity.deleteUser(userUuid);
             });
 
-            log.info("User creation workflow completed successfully for userId: {}, username: {}", userId, username);
+            log.info("User creation workflow completed successfully for userId: {}, email: {}", userId, email);
             return WorkflowResult.ok(createdUser.getId().toString());
 
         } catch (ApplicationFailure e) {
             log.error(
-                    "Application failure in user creation workflow for userId: {}, username: {}. Executing compensations.",
+                    "Application failure in user creation workflow for userId: {}, email: {}. Executing compensations.",
                     userId,
-                    username, e);
+                    email, e);
             saga.compensate();
             return WorkflowResult.error(e.getType());
         } catch (Exception e) {
-            log.error("Error in user creation workflow for userId: {}, username: {}. Executing compensations.", userId,
-                    username, e);
+            log.error("Error in user creation workflow for userId: {}, email: {}. Executing compensations.", userId,
+                    email, e);
             saga.compensate();
             throw e;
         }

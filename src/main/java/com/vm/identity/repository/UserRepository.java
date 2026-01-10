@@ -21,9 +21,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("SELECT u FROM User u WHERE u.email = :email AND (COALESCE(:includeDeleted, false) = true OR u.deleted = false)")
     Optional<User> findByEmail(@Param("email") String email, @Param("includeDeleted") Boolean includeDeleted);
 
-    @Query("SELECT u FROM User u WHERE u.username = :username AND (COALESCE(:includeDeleted, false) = true OR u.deleted = false)")
-    Optional<User> findByUsername(@Param("username") String username, @Param("includeDeleted") Boolean includeDeleted);
-
     // Convenience methods that exclude deleted users by default
     default Optional<User> findById(UUID id) {
         return findById(id, false);
@@ -37,23 +34,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
         return findByEmail(email, false);
     }
 
-    default Optional<User> findByUsername(String username) {
-        return findByUsername(username, false);
-    }
-
     @Query("SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM User u " +
            "WHERE u.email = :email " +
            "AND u.deleted = false")
     boolean existsByEmailExcludingDeleted(@Param("email") String email);
 
-    @Query("SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM User u " +
-           "WHERE (u.email = :email OR u.username = :username) " +
-           "AND u.deleted = false")
-    boolean existsByEmailOrUsernameExcludingDeleted(
-            @Param("email") String email,
-            @Param("username") String username);
-
     boolean existsByEmail(String email);
-    boolean existsByUsername(String username);
     boolean existsByIdpId(String idpId);
 }

@@ -153,10 +153,10 @@ public class UserUpdateWorkflowImpl implements UserUpdateWorkflow {
                 return WorkflowResult.error("UserNotFound");
             }
             User updatedUser = updatedUserOpt.get();
-            log.info("User update workflow completed successfully for userId: {}, username: {}", userId,
-                    updatedUser.getUsername());
-            log.info("Updated user object: id={}, username={}, email={}, firstName={}, lastName={}, idpId={}",
-                    updatedUser.getId(), updatedUser.getUsername(), updatedUser.getEmail(),
+            log.info("User update workflow completed successfully for userId: {}, email: {}", userId,
+                    updatedUser.getEmail());
+            log.info("Updated user object: id={}, email={}, firstName={}, lastName={}, idpId={}",
+                    updatedUser.getId(), updatedUser.getEmail(),
                     updatedUser.getFirstName(), updatedUser.getLastName(), updatedUser.getIdpId());
             return WorkflowResult.ok(updatedUser);
 

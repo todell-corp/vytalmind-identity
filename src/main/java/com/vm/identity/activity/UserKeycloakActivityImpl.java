@@ -25,7 +25,7 @@ public class UserKeycloakActivityImpl implements UserKeycloakActivity {
 
     @Override
     public String create(UserRepresentation userRep) {
-        log.info("Activity: Creating user in Keycloak: {}", userRep.getUsername());
+        log.info("Activity: Creating user in Keycloak: {}", userRep.getEmail());
         try {
             return keycloakClient.createUser(userRep);
         } catch (Exception e) {
@@ -33,7 +33,7 @@ public class UserKeycloakActivityImpl implements UserKeycloakActivity {
             throw ApplicationFailure.newFailure(
                     "Failed to create user in Keycloak",
                     "KeycloakCreateFailed",
-                    Map.of("username", userRep.getUsername(), "error", e.getMessage())
+                    Map.of("email", userRep.getEmail(), "error", e.getMessage())
             );
         }
     }

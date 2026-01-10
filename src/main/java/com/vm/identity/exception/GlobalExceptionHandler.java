@@ -42,12 +42,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UserAlreadyExistsException.class)
     public ResponseEntity<ErrorResponse> handleUserAlreadyExists(UserAlreadyExistsException ex) {
-        log.warn("User already exists - username: {}, email: {}", ex.getUsername(), ex.getEmail());
+        log.warn("User already exists - email: {}", ex.getEmail());
 
         Map<String, String> details = new HashMap<>();
-        if (ex.getUsername() != null) {
-            details.put("username", ex.getUsername());
-        }
         if (ex.getEmail() != null) {
             details.put("email", ex.getEmail());
         }

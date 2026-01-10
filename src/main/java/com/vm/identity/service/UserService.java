@@ -37,10 +37,10 @@ public class UserService {
     }
 
     public UserResponse createUser(UserCreateRequest request) {
-        log.info("Creating user with username: {}", request.getUsername());
+        log.info("Creating user with email: {}", request.getEmail());
 
         UUID userId = UUID.randomUUID();
-        String workflowId = "user-create-" + request.getUsername() + "-" + UUID.randomUUID();
+        String workflowId = "user-create-" + UUID.randomUUID();
 
         WorkflowOptions options = WorkflowOptions.newBuilder()
                 .setWorkflowId(workflowId)
@@ -52,7 +52,6 @@ public class UserService {
 
         WorkflowResult<String> result = workflow.createUser(
                 userId.toString(),
-                request.getUsername(),
                 request.getEmail(),
                 request.getPassword(),
                 request.getFirstName(),
@@ -60,21 +59,19 @@ public class UserService {
 
         if (!result.isSuccess()) {
             Map<String, String> errorDetails = new HashMap<>();
-            errorDetails.put("username", request.getUsername());
             errorDetails.put("email", request.getEmail());
             throw ApplicationFailureHandler.mapErrorCode(result.errorCode(), errorDetails);
         }
 
         UserResponse response = new UserResponse();
         response.setUserId(result.value());
-        response.setUsername(request.getUsername());
         response.setEmail(request.getEmail());
         response.setFirstName(request.getFirstName());
         response.setLastName(request.getLastName());
         response.setStatus("User created successfully");
         response.setWorkflowId(workflowId);
 
-        log.info("User created successfully with userId: {}, username: {}", result.value(), request.getUsername());
+        log.info("User created successfully with userId: {}, email: {}", result.value(), request.getEmail());
         return response;
     }
 
@@ -102,20 +99,19 @@ public class UserService {
         }
 
         User updatedUser = result.value();
-        log.info("Received user from workflow: id={}, username={}, email={}, firstName={}, lastName={}, idpId={}",
-                updatedUser.getId(), updatedUser.getUsername(), updatedUser.getEmail(),
+        log.info("Received user from workflow: id={}, email={}, firstName={}, lastName={}, idpId={}",
+                updatedUser.getId(), updatedUser.getEmail(),
                 updatedUser.getFirstName(), updatedUser.getLastName(), updatedUser.getIdpId());
 
         UserResponse response = new UserResponse();
         response.setUserId(updatedUser.getId().toString());
-        response.setUsername(updatedUser.getUsername());
         response.setEmail(updatedUser.getEmail());
         response.setFirstName(updatedUser.getFirstName());
         response.setLastName(updatedUser.getLastName());
         response.setStatus("User updated successfully");
         response.setWorkflowId(workflowId);
 
-        log.info("User updated successfully: {} (username: {})", userId, updatedUser.getUsername());
+        log.info("User updated successfully: {} (email: {})", userId, updatedUser.getEmail());
         return response;
     }
 
@@ -141,14 +137,13 @@ public class UserService {
         User user = result.value();
         UserResponse response = new UserResponse();
         response.setUserId(user.getId().toString());
-        response.setUsername(user.getUsername());
         response.setEmail(user.getEmail());
         response.setFirstName(user.getFirstName());
         response.setLastName(user.getLastName());
         response.setStatus("User retrieved successfully");
         response.setWorkflowId(workflowId);
 
-        log.info("User retrieved successfully: {} (username: {})", userId, user.getUsername());
+        log.info("User retrieved successfully: {} (email: {})", userId, user.getEmail());
         return response;
     }
 
