@@ -22,12 +22,16 @@ services:
       - DATABASE_URL=${DATABASE_URL:-jdbc:postgresql://localhost:5432/vytalmind-identity}
       - DATABASE_USERNAME=${DATABASE_USERNAME:-postgres}
       - DATABASE_PASSWORD=${DATABASE_PASSWORD:-postgres}
-      - DATABASE_CREDENTIAL_PROVIDER=environment
+      - DATABASE_CREDENTIAL_PROVIDER=${DATABASE_CREDENTIAL_PROVIDER:-vault}
+      - DATABASE_VAULT_ENABLED=${DATABASE_VAULT_ENABLED:-true}
+      - DATABASE_VAULT_SECRET_PATH=${DATABASE_VAULT_SECRET_PATH:-secret/data/database/vytalmind-identity}
       - KEYCLOAK_SERVER_URL=${KEYCLOAK_SERVER_URL:-https://keycloak.odell.com}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-vytalmind}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-vytalmind-identity-service}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
-      - KEYCLOAK_CREDENTIAL_PROVIDER=environment
+      - KEYCLOAK_CREDENTIAL_PROVIDER=${KEYCLOAK_CREDENTIAL_PROVIDER:-vault}
+      - KEYCLOAK_VAULT_ENABLED=${KEYCLOAK_VAULT_ENABLED:-true}
+      - KEYCLOAK_VAULT_SECRET_PATH=${KEYCLOAK_VAULT_SECRET_PATH:-secret/data/keycloak/service-account}
     ports:
       - "8080:8080"
     networks:
