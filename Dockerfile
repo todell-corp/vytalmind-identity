@@ -33,6 +33,9 @@ FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Copy and install the root CA certificates into Java truststore (runtime stage)
 COPY rootCA.pem /tmp/rootCA.pem
 COPY mkcert-root-ca.pem /tmp/mkcert-root-ca.pem
