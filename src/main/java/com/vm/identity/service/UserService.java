@@ -45,7 +45,7 @@ public class UserService {
         WorkflowOptions options = WorkflowOptions.newBuilder()
                 .setWorkflowId(workflowId)
                 .setTaskQueue(taskQueue)
-                .setWorkflowExecutionTimeout(Duration.ofSeconds(5))
+                .setWorkflowExecutionTimeout(Duration.ofMinutes(2))
                 .build();
 
         UserCreateWorkflow workflow = workflowClient.newWorkflowStub(UserCreateWorkflow.class, options);
@@ -83,7 +83,7 @@ public class UserService {
         WorkflowOptions options = WorkflowOptions.newBuilder()
                 .setWorkflowId(workflowId)
                 .setTaskQueue(taskQueue)
-                .setWorkflowExecutionTimeout(Duration.ofSeconds(5))
+                .setWorkflowExecutionTimeout(Duration.ofMinutes(2))
                 .build();
 
         UserUpdateWorkflow workflow = workflowClient.newWorkflowStub(UserUpdateWorkflow.class, options);
@@ -123,7 +123,7 @@ public class UserService {
         WorkflowOptions options = WorkflowOptions.newBuilder()
                 .setWorkflowId(workflowId)
                 .setTaskQueue(taskQueue)
-                .setWorkflowExecutionTimeout(Duration.ofSeconds(5))
+                .setWorkflowExecutionTimeout(Duration.ofMinutes(2))
                 .build();
 
         UserGetWorkflow workflow = workflowClient.newWorkflowStub(UserGetWorkflow.class, options);
@@ -155,7 +155,7 @@ public class UserService {
         WorkflowOptions options = WorkflowOptions.newBuilder()
                 .setWorkflowId(workflowId)
                 .setTaskQueue(taskQueue)
-                .setWorkflowExecutionTimeout(Duration.ofSeconds(5))
+                .setWorkflowExecutionTimeout(Duration.ofMinutes(2))
                 .build();
 
         UserDeleteWorkflow workflow = workflowClient.newWorkflowStub(UserDeleteWorkflow.class, options);

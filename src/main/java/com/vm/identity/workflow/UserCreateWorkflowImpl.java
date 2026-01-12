@@ -12,6 +12,8 @@ import io.temporal.workflow.Workflow;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
+import java.util.List;
+import java.util.HashMap;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -66,7 +68,7 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
             keycloakUser.setEmail(email);
             keycloakUser.setFirstName(firstName);
             keycloakUser.setLastName(lastName);
-            keycloakUser.setEnabled(true);
+            keycloakUser.setEnabled(false);
 
             CredentialRepresentation credential = new CredentialRepresentation();
             credential.setType(CredentialRepresentation.PASSWORD);
@@ -94,6 +96,30 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
                 log.warn("Compensating: Deleting user from database: {}", userId);
                 databaseActivity.deleteUser(userUuid);
             });
+
+            // Step 3: Update Keycloak user with vytalmind_user_id claim and enable account
+            log.info("Updating Keycloak user with vytalmind_user_id claim and enabling account: {}", keycloakUserId);
+
+            // Add compensation BEFORE executing the activity that might fail
+            saga.addCompensation(() -> {
+                log.warn("Compensating: Disabling user in Keycloak: {}", keycloakUserId);
+                keycloakActivity.disable(keycloakUserId);
+            });
+
+            UserRepresentation updateKeycloakUser = keycloakActivity.get(keycloakUserId);
+
+            // Set vytalmind_user_id attribute using the full attributes map
+            Map<String, List<String>> attributes = updateKeycloakUser.getAttributes();
+            if (attributes == null) {
+                attributes = new HashMap<>();
+            }
+
+            log.info("Postgres user: {}", createdUser.getId().toString());
+            attributes.put("vytalmind_user_id", Collections.singletonList(createdUser.getId().toString()));
+            updateKeycloakUser.setAttributes(attributes);
+            updateKeycloakUser.setEnabled(true);
+
+            keycloakActivity.update(keycloakUserId, updateKeycloakUser);
 
             log.info("User creation workflow completed successfully for userId: {}, email: {}", userId, email);
             return WorkflowResult.ok(createdUser.getId().toString());
