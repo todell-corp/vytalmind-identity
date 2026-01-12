@@ -1,6 +1,7 @@
 package com.vm.identity.activity;
 
 import com.vm.identity.client.KeycloakClient;
+import com.vm.identity.exception.ServiceException;
 import io.temporal.failure.ApplicationFailure;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
@@ -95,6 +96,61 @@ public class UserKeycloakActivityImpl implements UserKeycloakActivity {
                     "KeycloakGetFailed",
                     Map.of("keycloakUserId", keycloakUserId, "error", e.getMessage())
             );
+        }
+    }
+
+    @Override
+    public void assignClientRole(String keycloakUserId, String clientId, String roleName) {
+        log.info("Activity: Assigning client role '{}' from client '{}' to user: {}",
+                roleName, clientId, keycloakUserId);
+        try {
+            keycloakClient.assignClientRole(keycloakUserId, clientId, roleName);
+        } catch (ServiceException e) {
+            log.error("Activity failed: assign client role '{}' to user: {}", roleName, keycloakUserId, e);
+
+            // Map specific errors
+            String errorType = switch (e.getStatusCode()) {
+                case 404 -> "RoleNotFound";
+                case 403 -> "KeycloakPermissionDenied";
+                default -> "KeycloakRoleAssignmentFailed";
+            };
+
+            throw ApplicationFailure.newFailure(
+                    "Failed to assign client role in Keycloak",
+                    errorType,
+                    Map.of(
+                            "keycloakUserId", keycloakUserId,
+                            "clientId", clientId,
+                            "roleName", roleName,
+                            "error", e.getMessage()
+                    )
+            );
+        } catch (Exception e) {
+            log.error("Activity failed: assign client role '{}' to user: {}", roleName, keycloakUserId, e);
+            throw ApplicationFailure.newFailure(
+                    "Failed to assign client role in Keycloak",
+                    "KeycloakRoleAssignmentFailed",
+                    Map.of(
+                            "keycloakUserId", keycloakUserId,
+                            "clientId", clientId,
+                            "roleName", roleName,
+                            "error", e.getMessage()
+                    )
+            );
+        }
+    }
+
+    @Override
+    public void removeClientRole(String keycloakUserId, String clientId, String roleName) {
+        log.info("Activity: Removing client role '{}' from client '{}' from user: {}",
+                roleName, clientId, keycloakUserId);
+        try {
+            keycloakClient.removeClientRole(keycloakUserId, clientId, roleName);
+        } catch (Exception e) {
+            // Compensation should be best-effort, log but don't fail
+            log.error("Activity failed (non-fatal): remove client role '{}' from user: {}",
+                    roleName, keycloakUserId, e);
+            // Don't throw - compensations should be resilient
         }
     }
 }

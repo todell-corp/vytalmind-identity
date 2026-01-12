@@ -25,4 +25,10 @@ public interface UserKeycloakActivity {
 
     @ActivityMethod(name = "GetUserFromKeycloak")
     UserRepresentation get(String keycloakUserId);
+
+    @ActivityMethod(name = "AssignClientRoleToUser")
+    void assignClientRole(String keycloakUserId, String clientId, String roleName);
+
+    @ActivityMethod(name = "RemoveClientRoleFromUser")
+    void removeClientRole(String keycloakUserId, String clientId, String roleName);
 }

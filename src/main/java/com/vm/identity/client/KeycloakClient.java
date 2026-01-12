@@ -7,10 +7,16 @@ import jakarta.ws.rs.core.Response;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
+import org.keycloak.representations.idm.ClientRepresentation;
+import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Client for interacting with Keycloak Admin API.
@@ -21,11 +27,19 @@ public class KeycloakClient {
     private static final Logger log = LoggerFactory.getLogger(KeycloakClient.class);
 
     private final KeycloakCredentialProvider credentialProvider;
+    private final String apiClientId;
+    private final String defaultUserRole;
     private Keycloak keycloak;
     private String realm;
+    private String apiClientUuid;
 
-    public KeycloakClient(KeycloakCredentialProvider credentialProvider) {
+    public KeycloakClient(
+            KeycloakCredentialProvider credentialProvider,
+            @Value("${keycloak.api-client-id}") String apiClientId,
+            @Value("${keycloak.default-user-role}") String defaultUserRole) {
         this.credentialProvider = credentialProvider;
+        this.apiClientId = apiClientId;
+        this.defaultUserRole = defaultUserRole;
     }
 
     @PostConstruct
@@ -44,6 +58,15 @@ public class KeycloakClient {
 
         log.info("Keycloak client initialized with service account for realm: {}", creds.realm());
         log.info("Keycloak server URL: {}", creds.serverUrl());
+
+        // Cache API client UUID for role operations
+        try {
+            this.apiClientUuid = getClientUuidByClientId(apiClientId);
+            log.info("Cached API client UUID for client '{}': {}", apiClientId, apiClientUuid);
+        } catch (Exception e) {
+            log.error("Failed to retrieve client UUID for clientId: {}. Role operations will fail.", apiClientId, e);
+            throw new IllegalStateException("Cannot initialize KeycloakClient: client UUID lookup failed", e);
+        }
     }
 
     /**
@@ -179,6 +202,133 @@ public class KeycloakClient {
         } catch (Exception e) {
             log.error("Failed to disable user in Keycloak: {}", userId, e);
             throw new ServiceException("Failed to disable user in Keycloak: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Get client UUID by client-id (one-time lookup at initialization).
+     *
+     * @param clientId the client-id (e.g., "vytalmind-api")
+     * @return the client UUID (e.g., "f8d3c9e1-...")
+     */
+    private String getClientUuidByClientId(String clientId) {
+        log.info("Looking up client UUID for clientId: {}", clientId);
+
+        try {
+            List<ClientRepresentation> clients = keycloak.realm(realm)
+                    .clients()
+                    .findByClientId(clientId);
+
+            if (clients.isEmpty()) {
+                throw new ServiceException("Client not found: " + clientId, 404);
+            }
+
+            String uuid = clients.get(0).getId();
+            log.info("Found client UUID: {} for clientId: {}", uuid, clientId);
+            return uuid;
+        } catch (Exception e) {
+            log.error("Failed to lookup client UUID for clientId: {}", clientId, e);
+            throw new ServiceException("Failed to lookup client UUID: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Assign a client role to a user.
+     *
+     * @param userId   the Keycloak user ID
+     * @param clientId the client-id (e.g., "vytalmind-api")
+     * @param roleName the role name (e.g., "user")
+     */
+    public void assignClientRole(String userId, String clientId, String roleName) {
+        log.info("Assigning client role '{}' from client '{}' to user: {}", roleName, clientId, userId);
+
+        try {
+            // Get client UUID (use cached apiClientUuid if matching)
+            String clientUuid;
+            if (apiClientId.equals(clientId)) {
+                clientUuid = this.apiClientUuid;
+            } else {
+                // Fallback for other clients (future extensibility)
+                clientUuid = getClientUuidByClientId(clientId);
+            }
+
+            // Get role representation
+            RoleRepresentation role = keycloak.realm(realm)
+                    .clients()
+                    .get(clientUuid)
+                    .roles()
+                    .get(roleName)
+                    .toRepresentation();
+
+            if (role == null) {
+                throw new ServiceException("Role not found: " + roleName, 404);
+            }
+
+            // Assign role to user
+            keycloak.realm(realm)
+                    .users()
+                    .get(userId)
+                    .roles()
+                    .clientLevel(clientUuid)
+                    .add(Collections.singletonList(role));
+
+            log.info("Successfully assigned client role '{}' to user: {}", roleName, userId);
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to assign client role '{}' to user: {}", roleName, userId, e);
+            throw new ServiceException("Failed to assign client role: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Remove a client role from a user.
+     *
+     * @param userId   the Keycloak user ID
+     * @param clientId the client-id (e.g., "vytalmind-api")
+     * @param roleName the role name (e.g., "user")
+     */
+    public void removeClientRole(String userId, String clientId, String roleName) {
+        log.info("Removing client role '{}' from client '{}' from user: {}", roleName, clientId, userId);
+
+        try {
+            // Get client UUID (use cached apiClientUuid if matching)
+            String clientUuid;
+            if (apiClientId.equals(clientId)) {
+                clientUuid = this.apiClientUuid;
+            } else {
+                clientUuid = getClientUuidByClientId(clientId);
+            }
+
+            // Get role representation
+            RoleRepresentation role = keycloak.realm(realm)
+                    .clients()
+                    .get(clientUuid)
+                    .roles()
+                    .get(roleName)
+                    .toRepresentation();
+
+            if (role == null) {
+                log.warn("Role '{}' not found, skipping removal (idempotent)", roleName);
+                return;
+            }
+
+            // Remove role from user
+            keycloak.realm(realm)
+                    .users()
+                    .get(userId)
+                    .roles()
+                    .clientLevel(clientUuid)
+                    .remove(Collections.singletonList(role));
+
+            log.info("Successfully removed client role '{}' from user: {}", roleName, userId);
+        } catch (jakarta.ws.rs.NotFoundException e) {
+            // User or role not found - idempotent, log and continue
+            log.warn("User or role not found during removal, continuing (idempotent): {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("Failed to remove client role '{}' from user: {}", roleName, userId, e);
+            // Don't throw - compensation should be best-effort
+            // User deletion will clean up roles anyway
         }
     }
 }

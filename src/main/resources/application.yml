@@ -72,6 +72,8 @@ keycloak:
   realm: ${KEYCLOAK_REALM:vytalmind}
   client-id: ${KEYCLOAK_CLIENT_ID:vytalmind-identity-service}
   client-secret: ${KEYCLOAK_CLIENT_SECRET:}
+  api-client-id: ${KEYCLOAK_API_CLIENT_ID:vytalmind-api}
+  default-user-role: ${KEYCLOAK_DEFAULT_USER_ROLE:user}
   credential-provider: ${KEYCLOAK_CREDENTIAL_PROVIDER:vault}
   vault:
     enabled: ${KEYCLOAK_VAULT_ENABLED:false}

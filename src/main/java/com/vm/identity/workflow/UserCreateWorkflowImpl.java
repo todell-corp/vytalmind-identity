@@ -97,14 +97,8 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
                 databaseActivity.deleteUser(userUuid);
             });
 
-            // Step 3: Update Keycloak user with vytalmind_user_id claim and enable account
-            log.info("Updating Keycloak user with vytalmind_user_id claim and enabling account: {}", keycloakUserId);
-
-            // Add compensation BEFORE executing the activity that might fail
-            saga.addCompensation(() -> {
-                log.warn("Compensating: Disabling user in Keycloak: {}", keycloakUserId);
-                keycloakActivity.disable(keycloakUserId);
-            });
+            // Step 3: Update Keycloak user with vytalmind_user_id attribute (keep disabled)
+            log.info("Updating Keycloak user with vytalmind_user_id attribute: {}", keycloakUserId);
 
             UserRepresentation updateKeycloakUser = keycloakActivity.get(keycloakUserId);
 
@@ -117,9 +111,35 @@ public class UserCreateWorkflowImpl implements UserCreateWorkflow {
             log.info("Postgres user: {}", createdUser.getId().toString());
             attributes.put("vytalmind_user_id", Collections.singletonList(createdUser.getId().toString()));
             updateKeycloakUser.setAttributes(attributes);
-            updateKeycloakUser.setEnabled(true);
+            // NOTE: Do NOT set enabled=true here - user stays disabled until role assigned
 
             keycloakActivity.update(keycloakUserId, updateKeycloakUser);
+
+            // Step 4: Assign default client role to user (while still disabled)
+            log.info("Assigning default client role to user in Keycloak: {}", keycloakUserId);
+
+            String clientId = "vytalmind-api";
+            String roleName = "user";
+
+            saga.addCompensation(() -> {
+                log.warn("Compensating: Removing client role '{}' from client '{}' from user: {}",
+                        roleName, clientId, keycloakUserId);
+                keycloakActivity.removeClientRole(keycloakUserId, clientId, roleName);
+            });
+
+            keycloakActivity.assignClientRole(keycloakUserId, clientId, roleName);
+
+            // Step 5: Enable user account (final step after attributes + role assigned)
+            log.info("Enabling Keycloak user account: {}", keycloakUserId);
+
+            saga.addCompensation(() -> {
+                log.warn("Compensating: Disabling user in Keycloak: {}", keycloakUserId);
+                keycloakActivity.disable(keycloakUserId);
+            });
+
+            UserRepresentation enableUser = keycloakActivity.get(keycloakUserId);
+            enableUser.setEnabled(true);
+            keycloakActivity.update(keycloakUserId, enableUser);
 
             log.info("User creation workflow completed successfully for userId: {}, email: {}", userId, email);
             return WorkflowResult.ok(createdUser.getId().toString());
